@@ -5,6 +5,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/joho/godotenv"
 	"github.com/markbates/goth"
+	"github.com/markbates/goth/providers/facebook"
 	"github.com/markbates/goth/providers/google"
 	"github.com/shareed2k/goth_fiber"
 	"log"
@@ -19,22 +20,34 @@ func main() {
 		log.Fatal("Error loading .env file")
 	}
 
+	callBaclUrl := "https://auth.codegenapps.com"
 	app := fiber.New()
-	test := google.New(
-		os.Getenv("GOOGLE_CLIENT_ID"),
-		os.Getenv("GOOGLE_CLIENT_SECRET"),
-		"http://localhost:8080/google/callback")
-	goth.UseProviders(test)
+	googleConfig := google.New(os.Getenv("GOOGLE_CLIENT_ID"), os.Getenv("GOOGLE_CLIENT_SECRET"), callBaclUrl+"/auth/google/callback")
+	facebookConfig := facebook.New(os.Getenv("FACEBOOK_CLIENT_ID"), os.Getenv("FACEBOOK_CLIENT_SECRET"), callBaclUrl+"/auth/facebook/callback")
+	goth.UseProviders(googleConfig, facebookConfig)
 
 	// google login 因為需要丟參數
 	// 因此需要轉止一次
-	app.Get("/auth/:uid/:provider", func(ctx *fiber.Ctx) error {
-		uid, _ := Bin2hex(ctx.Params("uid"))
+	app.Get("/auth/:uid/:provider/login", func(ctx *fiber.Ctx) error {
+		uid, err := Bin2hex(ctx.Params("uid"))
+		if err != nil {
+			return err
+		}
+		log.Println(uid)
 		newURL := fmt.Sprintf("/auth/%s?state=%s", ctx.Params("provider"), uid)
+		log.Println(newURL)
 		return ctx.Redirect(newURL, fiber.StatusTemporaryRedirect)
 	})
 
-	app.Get("/auth/:provider", goth_fiber.BeginAuthHandler)
+	//
+	app.Get("/auth/:provider", func(ctx *fiber.Ctx) error {
+		url, err := goth_fiber.GetAuthURL(ctx)
+		if err != nil {
+			return ctx.Status(fiber.StatusBadRequest).SendString(err.Error())
+		}
+		log.Println(url)
+		return ctx.Redirect(url, fiber.StatusTemporaryRedirect)
+	})
 
 	app.Get("/:provider/callback", func(ctx *fiber.Ctx) error {
 		state, err := Hex2Bin(ctx.Query("state"))
@@ -62,7 +75,7 @@ func main() {
 		return ctx.Redirect(clitneURL, fiber.StatusTemporaryRedirect)
 	})
 
-	if err := app.Listen(":8080"); err != nil {
+	if err := app.Listen("localhost:8080"); err != nil {
 		log.Fatal(err)
 	}
 }
