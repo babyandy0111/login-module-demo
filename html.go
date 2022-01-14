@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gofiber/fiber/v2"
+	"html"
 	"html/template"
 	"io/ioutil"
 	"log"
@@ -21,14 +22,22 @@ func main() {
 	app := fiber.New()
 	app.Get("/", func(c *fiber.Ctx) error {
 		info := make(map[string]interface{})
-		info["menu1"] = getData("https://lmd4le8g.codegenapps.com/menu?menu.pid=0")
+		token := ""
+		info["menu1"] = requestGetAPI("https://lmd4le8g.codegenapps.com/menu", "{&quot;menu.pid&quot;:&quot;0&quot;}", token)
 		// info["menu2"] = getData("https://lmd4le8g.codegenapps.com/menu?menu.pid=1")
 
-		// log.Println(info)
+		_ =
+			`
+			<html><head><meta charset="utf-8"></head>
+			<range id="">
+			
+			</range>
+			`
 
 		tmpHtml :=
 			`
 			<html><head><meta charset="utf-8"></head>
+
 			{{ $menu1s := .menu1 }}
 			{{ range $index, $menu1 := $menu1s }}
 				
@@ -39,21 +48,27 @@ func main() {
 				</li>
 				<br>
 
-				{{ $endpoint := Replace "https://lmd4le8g.codegenapps.com/menu" "$menu1.id" $menu1.id }}
-				{{ $request := Replace "{\"menu.pid\":\"$menu1.id\"}" "$menu1.id" $menu1.id }}
+				{{ $endpoint := Replace "https://lmd4le8g.codegenapps.com/menu/$menu1.id" "menu1.id" $menu1.id }}
+				{{ $request := Replace "{&quot;menu.pid&quot;:&quot;$menu1.id&quot;}" "$menu1.id" $menu1.id }}
 				{{ $action := "GET" }}
-				{{ $menu2s := FetchData $menu1 $action $endpoint $request }}
-				{{ range $index, $menu2 := $menu2s }}
-					<a href="javascript:void(0)">
-						{{ $menu2 }}
-					</a>
-					<br>
-				{{ end }}
+				{{ $menu2s := FetchDataInRange $action $endpoint $request "" }}
+				{{ $menu2Total := len $menu2s }}
 				
+				{{ if gt $menu2Total 0 }}
+					有資料
+					{{ range $index, $menu2 := $menu2s }}
+						<a href="javascript:void(0)">
+							{{ $menu2 }}
+						</a>
+						<br>
+					{{ end }}
+				{{ end }}
+
 			{{ end }}
 			</html>
 			`
 
+		// log.Println(editorHtml)
 		html := getNewHtml(info, tmpHtml)
 		c.Set(fiber.HeaderContentType, fiber.MIMETextHTML)
 		return c.SendString(html)
@@ -83,42 +98,98 @@ func replace(input, from string, to interface{}) string {
 	return strings.Replace(input, from, s, -1)
 }
 
-func gogo(mapInterface map[string]interface{}, action, endpoint, request string) []interface{} {
+func fetchDataInRange(action, endpoint, request, token string) []interface{} {
+	var res []interface{}
+	request = html.UnescapeString(request)
 	if action == "GET" {
 		endpoint = fmt.Sprintf("%s?%s", endpoint, json2query(request))
-	}
-	// s := mapString["id"]
-	// log.Println(mapInterface["id"])
-	log.Println(endpoint, request)
-	// url := fmt.Sprintf("https://lmd4le8g.codegenapps.com/menu?menu.pid=%v", mapInterface[0]["id"])
-	// log.Println("https://lmd4le8g.codegenapps.com/menu?menu.pid=")
-	// return getData(url)
-	return nil
-}
-func getData(url string) []interface{} {
-	// log.Println(url)
-	res, err := http.Get(url)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer res.Body.Close()
-	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		log.Fatal(err)
+		// log.Println(endpoint)
+		r := requestGetAPI(endpoint, request, token)
+		res = r
 	}
 
-	var resData APIResponse
-	err = json.Unmarshal(body, &resData)
-	if err != nil {
-		log.Fatal(err)
+	if action == "POST" {
+		r := requestPostAPI(endpoint, request, token)
+		res = r
 	}
-	return resData.Data
+
+	return res
+}
+
+func requestGetAPI(endpoint, request, token string) []interface{} {
+	var res APIResponse
+	requestData := bytes.NewBuffer([]byte(request))
+
+	req, err := http.NewRequest("GET", endpoint, requestData)
+	if err != nil {
+		log.Println("requestGetAPI Request err:", err)
+		return nil
+	}
+
+	// 暫時還沒有加入jwt
+	req.Header.Set("CGA-Header", "cga-good-good")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Bearer", token)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+	defer resp.Body.Close()
+
+	body, _ := ioutil.ReadAll(resp.Body)
+
+	err = json.Unmarshal(body, &res)
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+
+	return res.Data
+}
+
+func requestPostAPI(endpoint, request, token string) []interface{} {
+	var res APIResponse
+	requestData := bytes.NewBuffer([]byte(request))
+
+	req, err := http.NewRequest("POST", endpoint, requestData)
+	if err != nil {
+		log.Println("requestGetAPI Request err:", err)
+		return nil
+	}
+
+	// 暫時還沒有加入jwt
+	req.Header.Set("CGA-Header", "cga-good-good")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Bearer", token)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+	defer resp.Body.Close()
+
+	body, _ := ioutil.ReadAll(resp.Body)
+
+	err = json.Unmarshal(body, &res)
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+
+	return res.Data
 }
 
 func getNewHtml(apiInfo map[string]interface{}, temples string) string {
 	funcMap := template.FuncMap{
-		"FetchData": gogo,
-		"Replace":   replace,
+		"FetchDataInRange": fetchDataInRange,
+		"Replace":          replace,
 	}
 	t, err := template.New("tmp").Funcs(funcMap).Parse(temples)
 	if err != nil {
