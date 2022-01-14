@@ -29,9 +29,44 @@ func main() {
 		_ =
 			`
 			<html><head><meta charset="utf-8"></head>
-			<range id="">
-			
+			<ul class="navigation-menu">
+			<range id="0705cf66-d77b-428d-bda3-ddb2d0db16e7" 
+			data-gjs-aliasname="menu1" 
+			data-gjs-endpoint="https://lmd4le8g.codegenapps.com/menu/$menu1.id" 
+			data-gjs-request="{&quot;menu.pid&quot;:&quot;$menu.id&quot;}" 
+			data-gjs-action="GET">
+			  
+				<li class="has-submenu parent-menu-item">
+				  <a href="javascript:void(0)" id="ipcrp">找廠商</a>
+				  
+		
+				  <featchdatainrange data-gjs-aliasname="menu2" 
+					data-gjs-endpoint="https://lmd4le8g.codegenapps.com/menu/$menu1.id" 
+					data-gjs-request="{&quot;menu.pid&quot;:&quot;$menu.id&quot;}" 
+					data-gjs-action="GET">
+		
+		
+				  <if id="22726769-fc0c-4cde-a1a8-25a304f7f9e4" gjs-data-logic="if gt xxxx 0">
+					<span class="menu-arrow"></span>
+					
+					<rangeinrange id="0705cf66-d77b-428d-bda3-ddb2d0db16e7-2">
+		
+					  <ul class="submenu">
+						<li>
+						  <a href="" class="sub-menu-item">
+							平面設計公司
+						  </a>
+						</li>
+					  </ul>
+					</rangeinrange>
+		
+				  </if>
+		
+		
+				</li>
+			 
 			</range>
+		 </ul>
 			`
 
 		tmpHtml :=
