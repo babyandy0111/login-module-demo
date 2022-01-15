@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Title</title>
+</head>
+<body>
+<ul class="navigation-menu">
+    {{ $menu1endpoint := "https://lmd4le8g.codegenapps.com/menu?menu.pid=0" }}
+    {{ $menu1request := "" }}
+    {{ $menu1action := "GET" }}
+    {{ $menu1s := FetchData $menu1action $menu1endpoint $menu1request "" }}
+    {{ range $index, $menu1 := $menu1s }}
+
+    <li class="has-submenu parent-menu-item">
+        <a href="javascript:void(0)" id="ipcrp">找廠商</a>
+
+
+        {{ $menu2endpoint := Replace "https://lmd4le8g.codegenapps.com/menu?menu.pid=1" "$menu2" $menu2 }}
+        {{ $menu2request := Replace "" "$menu2" $menu2 }}
+        {{ $menu2action := "GET" }}
+        {{ $menu2s := FetchData $menu2action $menu2endpoint $menu2request "" }}
+        {{ $menu2Total := len $menu2s }}
+
+
+        {{ if gt $menu2Total 0 }}
+        <span class="menu-arrow"></span>
+
+        {{ range $menu2Index, $menu2 := $menu2s }}
+
+        <ul class="submenu">
+            <li>
+                <a href="" class="sub-menu-item">
+                    平面設計公司
+                </a>
+            </li>
+        </ul>
+        {{ end }}
+
+        {{ end }}
+
+
+    </li>
+
+    {{ end }}
+</ul>
+
+
+</body>
+</html>

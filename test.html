@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<ul class="navigation-menu">
+    <range id="i1"
+           data-gjs-aliasname="menu1"
+           data-gjs-endpoint="https://lmd4le8g.codegenapps.com/menu"
+           data-gjs-request="{&#34;menu.pid&#34;:&#34;0&#34;}"
+           data-gjs-action="GET">
+
+        <li class="has-submenu parent-menu-item">
+            <a href="javascript:void(0)" id="ipcrp">{{ $menu1.menu_name }}</a>
+
+            <fetchdata data-gjs-aliasname="menu2"
+                       data-gjs-endpoint="https://lmd4le8g.codegenapps.com/menu?menu.pid=$menu1.pid"
+                       data-gjs-request="{&#34;menu.pid&#34;:&#34;1&#34;}"
+                       data-gjs-action="GET"></fetchdata>
+
+            <if id="22726769-fc0c-4cde-a1a8-25a304f7f9e4"
+                data-gjs-logic="gt $menu2Total 0">
+                <span class="menu-arrow"></span>
+
+                <for-var
+                        data-gjs-varname="menu2"
+                        id="0705cf66-d77b-428d-bda3-ddb2d0db16e7-2">
+
+                    <ul class="submenu">
+                        <li>
+                            <a href="" class="sub-menu-item">
+                                {{ $menu2.menu_name }}
+                            </a>
+                        </li>
+                    </ul>
+                </for-var>
+
+            </if>
+
+        </li>
+
+    </range>
+</ul>
+
+
+</body>
+</html>

@@ -2,14 +2,17 @@ package main
 
 import (
 	"bytes"
+	b64 "encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/PuerkitoBio/goquery"
 	"github.com/gofiber/fiber/v2"
 	"html"
 	"html/template"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 )
 
@@ -21,94 +24,80 @@ type APIResponse struct {
 func main() {
 	app := fiber.New()
 	app.Get("/", func(c *fiber.Ctx) error {
-		info := make(map[string]interface{})
-		token := ""
-		info["menu1"] = requestGetAPI("https://lmd4le8g.codegenapps.com/menu", "{&quot;menu.pid&quot;:&quot;0&quot;}", token)
-		// info["menu2"] = getData("https://lmd4le8g.codegenapps.com/menu?menu.pid=1")
 
-		_ =
-			`
-			<html><head><meta charset="utf-8"></head>
-			<ul class="navigation-menu">
-			<range id="0705cf66-d77b-428d-bda3-ddb2d0db16e7" 
-			data-gjs-aliasname="menu1" 
-			data-gjs-endpoint="https://lmd4le8g.codegenapps.com/menu/$menu1.id" 
-			data-gjs-request="{&quot;menu.pid&quot;:&quot;$menu.id&quot;}" 
-			data-gjs-action="GET">
-			  
-				<li class="has-submenu parent-menu-item">
-				  <a href="javascript:void(0)" id="ipcrp">找廠商</a>
-				  
-		
-				  <featchdatainrange data-gjs-aliasname="menu2" 
-					data-gjs-endpoint="https://lmd4le8g.codegenapps.com/menu/$menu1.id" 
-					data-gjs-request="{&quot;menu.pid&quot;:&quot;$menu.id&quot;}" 
-					data-gjs-action="GET">
-		
-		
-				  <if id="22726769-fc0c-4cde-a1a8-25a304f7f9e4" gjs-data-logic="if gt xxxx 0">
-					<span class="menu-arrow"></span>
-					
-					<rangeinrange id="0705cf66-d77b-428d-bda3-ddb2d0db16e7-2">
-		
-					  <ul class="submenu">
-						<li>
-						  <a href="" class="sub-menu-item">
-							平面設計公司
-						  </a>
-						</li>
-					  </ul>
-					</rangeinrange>
-		
-				  </if>
-		
-		
-				</li>
-			 
-			</range>
-		 </ul>
-			`
+		token := "123"
+		f, err := os.Open("test.html")
+		if err != nil {
+			log.Println(err)
+		}
+		defer f.Close()
 
-		tmpHtml :=
-			`
-			<html><head><meta charset="utf-8"></head>
-
-			{{ $menu1s := .menu1 }}
-			{{ range $index, $menu1 := $menu1s }}
-				
-				<li class="has-submenu parent-parent-menu-item">
-					<a href="https://lmd4le8g.codegenapps.com/menu?menu.pid={{ $menu1.id }}" target="_blank">
-						{{ $index }} - {{ $menu1.id }} - {{ $menu1.menu_name }}
-					</a>
-				</li>
-				<br>
-
-				{{ $endpoint := Replace "https://lmd4le8g.codegenapps.com/menu/$menu1.id" "menu1.id" $menu1.id }}
-				{{ $request := Replace "{&quot;menu.pid&quot;:&quot;$menu1.id&quot;}" "$menu1.id" $menu1.id }}
-				{{ $action := "GET" }}
-				{{ $menu2s := FetchDataInRange $action $endpoint $request "" }}
-				{{ $menu2Total := len $menu2s }}
-				
-				{{ if gt $menu2Total 0 }}
-					有資料
-					{{ range $index, $menu2 := $menu2s }}
-						<a href="javascript:void(0)">
-							{{ $menu2 }}
-						</a>
-						<br>
-					{{ end }}
-				{{ end }}
-
-			{{ end }}
-			</html>
-			`
-
-		// log.Println(editorHtml)
-		html := getNewHtml(info, tmpHtml)
+		tmpl := getTmpl(f, token)
+		escaped := html.UnescapeString(tmpl)
+		// log.Println("escaped", escaped)
+		newHtml := getNewHtml(escaped)
 		c.Set(fiber.HeaderContentType, fiber.MIMETextHTML)
-		return c.SendString(html)
+		return c.SendString(newHtml)
 	})
-	app.Listen(":3000")
+	app.Listen(":8080")
+}
+
+func getTmpl(html *os.File, token string) string {
+	dom, err := goquery.NewDocumentFromReader(html)
+	if err != nil {
+		log.Println(err)
+		return err.Error()
+	}
+
+	dom.Find("range").Each(func(i int, s *goquery.Selection) {
+		aliasName := s.AttrOr("data-gjs-aliasname", "")
+		endpoint := s.AttrOr("data-gjs-endpoint", "")
+		request := s.AttrOr("data-gjs-request", "")
+		action := s.AttrOr("data-gjs-action", "")
+
+		content, err := s.Html()
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		s.ReplaceWithHtml(rangeTagToTmpl(content, aliasName, endpoint, request, action, token))
+	})
+
+	dom.Find("for-var").Each(func(i int, s *goquery.Selection) {
+		aliasName := s.AttrOr("data-gjs-varname", "")
+		content, err := s.Html()
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		s.ReplaceWithHtml(forVarTagToTmpl(content, aliasName))
+	})
+
+	dom.Find("if").Each(func(i int, s *goquery.Selection) {
+		logic := s.AttrOr("data-gjs-logic", "")
+		content, err := s.Html()
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		s.ReplaceWithHtml(ifTagToTmpl(content, logic))
+	})
+
+	dom.Find("fetchdata").Each(func(i int, s *goquery.Selection) {
+		aliasName := s.AttrOr("data-gjs-aliasname", "")
+		endpoint := s.AttrOr("data-gjs-endpoint", "")
+		request := s.AttrOr("data-gjs-request", "")
+		action := s.AttrOr("data-gjs-action", "GET")
+		s.ReplaceWithHtml(fetchDataTagToTmpl(aliasName, endpoint, request, action, token))
+	})
+
+	tmpl, err := dom.Html()
+	if err != nil {
+		log.Println(err)
+		return err.Error()
+	}
+
+	return tmpl
 }
 
 func json2query(jsonString string) string {
@@ -134,8 +123,10 @@ func replace(input, from string, to interface{}) string {
 }
 
 func fetchDataInRange(action, endpoint, request, token string) []interface{} {
+	req, _ := b64.StdEncoding.DecodeString(request)
 	var res []interface{}
-	request = html.UnescapeString(request)
+	request = html.UnescapeString(string(req))
+	// log.Println("fetchDataInRange", request)
 	if action == "GET" {
 		endpoint = fmt.Sprintf("%s?%s", endpoint, json2query(request))
 		// log.Println(endpoint)
@@ -147,7 +138,7 @@ func fetchDataInRange(action, endpoint, request, token string) []interface{} {
 		r := requestPostAPI(endpoint, request, token)
 		res = r
 	}
-
+	// log.Println("fetchDataInRange", res)
 	return res
 }
 
@@ -221,11 +212,12 @@ func requestPostAPI(endpoint, request, token string) []interface{} {
 	return res.Data
 }
 
-func getNewHtml(apiInfo map[string]interface{}, temples string) string {
+func getNewHtml(temples string) string {
 	funcMap := template.FuncMap{
-		"FetchDataInRange": fetchDataInRange,
-		"Replace":          replace,
+		"FetchData": fetchDataInRange,
+		"Replace":   replace,
 	}
+	// log.Println("temples", temples)
 	t, err := template.New("tmp").Funcs(funcMap).Parse(temples)
 	if err != nil {
 		log.Println("getNewHtml template err: ", err)
@@ -233,10 +225,68 @@ func getNewHtml(apiInfo map[string]interface{}, temples string) string {
 	}
 
 	var tpl bytes.Buffer
-	if err := t.Execute(&tpl, apiInfo); err != nil {
+	if err := t.Execute(&tpl, nil); err != nil {
 		log.Println("getNewHtml template Execute err: ", err.Error())
 		return err.Error()
 	}
 
+	// log.Println("temples", tpl.String())
+
 	return tpl.String()
+}
+
+func ifTagToTmpl(content, logic string) string {
+	if logic == "" {
+		return content
+	}
+	tmplTop := fmt.Sprintf(`{{ if %s }}`, logic)
+	tmplContent := content
+	tmplEnd := `{{ end }}`
+	tmpl := tmplTop + tmplContent + tmplEnd
+	return tmpl
+}
+
+func forVarTagToTmpl(content, aliasName string) string {
+	if aliasName == "" {
+		return content
+	}
+	tmplTop := fmt.Sprintf(`{{ range $%sIndex, $%s := $%ss }}`, aliasName, aliasName, aliasName)
+	tmplContent := content
+	tmplEnd := `{{ end }}`
+	tmpl := tmplTop + tmplContent + tmplEnd
+	return tmpl
+}
+
+func rangeTagToTmpl(content, aliasName, endpoint, request, action, token string) string {
+	if aliasName == "" {
+		return content
+	}
+
+	endpointTmp := fmt.Sprintf(`{{ $%sendpoint := "%s" }}`, aliasName, endpoint)
+	request = b64.StdEncoding.EncodeToString([]byte(request))
+	requestTmp := fmt.Sprintf(`{{ $%srequest := "%s" }}`, aliasName, request)
+	actionTmp := fmt.Sprintf(`{{ $%saction := "%s" }}`, aliasName, action)
+	fetchData := fmt.Sprintf(`{{ $%ss := FetchData $%saction $%sendpoint $%srequest "%s" }}`, aliasName, aliasName, aliasName, aliasName, token)
+	tmplVar := endpointTmp + requestTmp + actionTmp + fetchData
+	tmplTop := fmt.Sprintf(`{{ range $index, $%s := $%ss }}`, aliasName, aliasName)
+	tmplContent := content
+	tmplEnd := `{{ end }}`
+	tmpl := tmplVar + tmplTop + tmplContent + tmplEnd
+	return tmpl
+}
+
+func fetchDataTagToTmpl(aliasName, endpoint, request, action, token string) string {
+	if aliasName == "" || endpoint == "" {
+		return ""
+	}
+
+	endpointTmp := fmt.Sprintf(`{{ $%sendpoint := "%s" }} {{ $%sendpoint }} `, aliasName, endpoint, aliasName)
+	request = b64.StdEncoding.EncodeToString([]byte(request))
+	requestTmp := fmt.Sprintf(`{{ $%srequest := "%s" }}`, aliasName, request)
+	actionTmp := fmt.Sprintf(`{{ $%saction := "%s" }}`, aliasName, action)
+	tmplVar := fmt.Sprintf(`{{ $%ss := FetchData $%saction $%sendpoint $%srequest "%s" }}`, aliasName, aliasName, aliasName, aliasName, token)
+	tmplVarTotal := fmt.Sprintf(`{{ $%sTotal := len $%ss }}`, aliasName, aliasName)
+	tmpl := endpointTmp + requestTmp + actionTmp + tmplVar + tmplVarTotal
+	//log.Println(tmpl)
+	return tmpl
 }
