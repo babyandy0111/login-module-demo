@@ -26,7 +26,7 @@ func main() {
 	app := fiber.New()
 	app.Get("/", func(c *fiber.Ctx) error {
 
-		token := "123"
+		token := ""
 		f, err := os.Open("test.html")
 		if err != nil {
 			log.Println(err)
@@ -64,14 +64,14 @@ func getTmpl(html *os.File, token string) string {
 		s.ReplaceWithHtml(rangeTagToTmpl(content, aliasName, endpoint, request, action, token))
 	})
 
-	dom.Find("for-var").Each(func(i int, s *goquery.Selection) {
+	dom.Find("for").Each(func(i int, s *goquery.Selection) {
 		aliasName := s.AttrOr("data-gjs-varname", "")
 		content, err := s.Html()
 		if err != nil {
 			log.Println(err)
 			return
 		}
-		s.ReplaceWithHtml(forVarTagToTmpl(content, aliasName))
+		s.ReplaceWithHtml(forTagToTmpl(content, aliasName))
 	})
 
 	dom.Find("if").Each(func(i int, s *goquery.Selection) {
@@ -90,6 +90,15 @@ func getTmpl(html *os.File, token string) string {
 		request := s.AttrOr("data-gjs-request", "{&#34;xxx&#34;:&#34;0&#34;}")
 		action := s.AttrOr("data-gjs-action", "GET")
 		s.ReplaceWithHtml(fetchDataTagToTmpl(aliasName, endpoint, request, action, token))
+	})
+
+	dom.Find("member").Each(func(i int, s *goquery.Selection) {
+		content, err := s.Html()
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		s.ReplaceWithHtml(memberTagToTmpl(content, token))
 	})
 
 	tmpl, err := dom.Html()
@@ -293,7 +302,7 @@ func ifTagToTmpl(content, logic string) string {
 	return tmpl
 }
 
-func forVarTagToTmpl(content, aliasName string) string {
+func forTagToTmpl(content, aliasName string) string {
 	if aliasName == "" {
 		return content
 	}
@@ -354,4 +363,16 @@ func fetchDataTagToTmpl(aliasName, endpoint, request, action, token string) stri
 	tmpl := endpointTmp + requestTmp + actionTmp + tmplVar + tmplVarTotal
 	//log.Println(tmpl)
 	return tmpl
+}
+
+func memberTagToTmpl(content, token string) string {
+	if token == "" {
+		return ""
+	}
+	// todo check token
+	if true {
+		return content
+	} else {
+		return ""
+	}
 }
