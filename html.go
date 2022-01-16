@@ -13,6 +13,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 )
 
@@ -52,8 +53,8 @@ func getTmpl(html *os.File, token string) string {
 	dom.Find("range").Each(func(i int, s *goquery.Selection) {
 		aliasName := s.AttrOr("data-gjs-aliasname", "")
 		endpoint := s.AttrOr("data-gjs-endpoint", "")
-		request := s.AttrOr("data-gjs-request", "")
-		action := s.AttrOr("data-gjs-action", "")
+		request := s.AttrOr("data-gjs-request", "{&#34;xxx&#34;:&#34;0&#34;}")
+		action := s.AttrOr("data-gjs-action", "GET")
 
 		content, err := s.Html()
 		if err != nil {
@@ -74,7 +75,7 @@ func getTmpl(html *os.File, token string) string {
 	})
 
 	dom.Find("if").Each(func(i int, s *goquery.Selection) {
-		logic := s.AttrOr("data-gjs-logic", "")
+		logic := s.AttrOr("data-gjs-logic", "gt 1 0")
 		content, err := s.Html()
 		if err != nil {
 			log.Println(err)
@@ -86,7 +87,7 @@ func getTmpl(html *os.File, token string) string {
 	dom.Find("fetchdata").Each(func(i int, s *goquery.Selection) {
 		aliasName := s.AttrOr("data-gjs-aliasname", "")
 		endpoint := s.AttrOr("data-gjs-endpoint", "")
-		request := s.AttrOr("data-gjs-request", "")
+		request := s.AttrOr("data-gjs-request", "{&#34;xxx&#34;:&#34;0&#34;}")
 		action := s.AttrOr("data-gjs-action", "GET")
 		s.ReplaceWithHtml(fetchDataTagToTmpl(aliasName, endpoint, request, action, token))
 	})
@@ -117,9 +118,54 @@ func json2query(jsonString string) string {
 	return queryString
 }
 
-func replace(input, from string, to interface{}) string {
-	s := fmt.Sprintf("%v", to)
-	return strings.Replace(input, from, s, -1)
+func replaceJson(values ...interface{}) string {
+	if len(values)%2 != 0 {
+		log.Println("len(values)%2 err")
+		return values[0].(string)
+	}
+
+	source, err := b64.StdEncoding.DecodeString(values[0].(string))
+	if err != nil {
+		return values[0].(string)
+	}
+	// log.Println("source", source)
+	jsonRes := string(source)
+	//dict := make(map[string]interface{}, len(values)/2)
+	for i := 2; i < len(values); i += 2 {
+		key, ok := values[i].(string)
+		if !ok {
+			return "dict keys must be strings"
+		}
+		s := fmt.Sprintf("%v", values[i+1])
+		jsonRes = strings.Replace(jsonRes, key, s, -1)
+		//dict[key] = values[i+1]
+		// log.Println("loop:", key, values[i+1])
+	}
+	// log.Println("replaceJson:", jsonRes)
+	return b64.StdEncoding.EncodeToString([]byte(jsonRes))
+}
+
+func replaceEndpoint(values ...interface{}) string {
+	if len(values)%2 != 0 {
+		log.Println("len(values)%2 err")
+		return values[0].(string)
+	}
+
+	source := values[0].(string)
+
+	//dict := make(map[string]interface{}, len(values)/2)
+	for i := 2; i < len(values); i += 2 {
+		key, ok := values[i].(string)
+		if !ok {
+			return "dict keys must be strings"
+		}
+		s := fmt.Sprintf("%v", values[i+1])
+		source = strings.Replace(source, key, s, -1)
+		//dict[key] = values[i+1]
+		// log.Println("loop:", key, values[i+1])
+	}
+	// log.Println("source", source)
+	return html.UnescapeString(source)
 }
 
 func fetchDataInRange(action, endpoint, request, token string) []interface{} {
@@ -214,8 +260,9 @@ func requestPostAPI(endpoint, request, token string) []interface{} {
 
 func getNewHtml(temples string) string {
 	funcMap := template.FuncMap{
-		"FetchData": fetchDataInRange,
-		"Replace":   replace,
+		"FetchData":       fetchDataInRange,
+		"ReplaceEndpoint": replaceEndpoint,
+		"ReplaceJson":     replaceJson,
 	}
 	// log.Println("temples", temples)
 	t, err := template.New("tmp").Funcs(funcMap).Parse(temples)
@@ -261,17 +308,17 @@ func rangeTagToTmpl(content, aliasName, endpoint, request, action, token string)
 	if aliasName == "" {
 		return content
 	}
-
-	endpointTmp := fmt.Sprintf(`{{ $%sendpoint := "%s" }}`, aliasName, endpoint)
-	request = b64.StdEncoding.EncodeToString([]byte(request))
-	requestTmp := fmt.Sprintf(`{{ $%srequest := "%s" }}`, aliasName, request)
-	actionTmp := fmt.Sprintf(`{{ $%saction := "%s" }}`, aliasName, action)
-	fetchData := fmt.Sprintf(`{{ $%ss := FetchData $%saction $%sendpoint $%srequest "%s" }}`, aliasName, aliasName, aliasName, aliasName, token)
-	tmplVar := endpointTmp + requestTmp + actionTmp + fetchData
+	//endpointTmp := fmt.Sprintf(`{{ $%sendpoint := "%s" }}`, aliasName, endpoint)
+	//request = b64.StdEncoding.EncodeToString([]byte(request))
+	//requestTmp := fmt.Sprintf(`{{ $%srequest := "%s" }}`, aliasName, request)
+	//actionTmp := fmt.Sprintf(`{{ $%saction := "%s" }}`, aliasName, action)
+	//fetchData := fmt.Sprintf(`{{ $%ss := FetchData $%saction $%sendpoint $%srequest "%s" }}`, aliasName, aliasName, aliasName, aliasName, token)
+	// tmplVar := endpointTmp + requestTmp + actionTmp + fetchData
+	fetchData := fetchDataTagToTmpl(aliasName, endpoint, request, action, token)
 	tmplTop := fmt.Sprintf(`{{ range $index, $%s := $%ss }}`, aliasName, aliasName)
 	tmplContent := content
 	tmplEnd := `{{ end }}`
-	tmpl := tmplVar + tmplTop + tmplContent + tmplEnd
+	tmpl := fetchData + tmplTop + tmplContent + tmplEnd
 	return tmpl
 }
 
@@ -280,9 +327,27 @@ func fetchDataTagToTmpl(aliasName, endpoint, request, action, token string) stri
 		return ""
 	}
 
-	endpointTmp := fmt.Sprintf(`{{ $%sendpoint := "%s" }} {{ $%sendpoint }} `, aliasName, endpoint, aliasName)
+	regexp, _ := regexp.Compile(`\$[a-zA-Z0-9]*[a-zA-Z0-9]\.[a-zA-Z0-9]*[a-zA-Z0-9]`)
+	resEndpoint := regexp.FindAllString(endpoint, -1)
+	tmpEndpointVar := ""
+	for _, v := range resEndpoint {
+		tmpEndpointVar = tmpEndpointVar + "\"" + v + "\"" + " " + v + " "
+	}
+
+	resJson := regexp.FindAllString(request, -1)
+	tmpRequestVar := ""
+	for _, v := range resJson {
+		tmpRequestVar = tmpRequestVar + "\"" + v + "\"" + " " + v + " "
+	}
+
 	request = b64.StdEncoding.EncodeToString([]byte(request))
-	requestTmp := fmt.Sprintf(`{{ $%srequest := "%s" }}`, aliasName, request)
+
+	// log.Println("tmpVar", tmpRequestVar)
+
+	endpointTmp := fmt.Sprintf(`{{ $%sendpoint := ReplaceEndpoint "%s" "" %s }}`, aliasName, endpoint, tmpEndpointVar)
+
+	requestTmp := fmt.Sprintf(`{{ $%srequest := ReplaceJson "%s" "" %s }}`, aliasName, request, tmpRequestVar)
+
 	actionTmp := fmt.Sprintf(`{{ $%saction := "%s" }}`, aliasName, action)
 	tmplVar := fmt.Sprintf(`{{ $%ss := FetchData $%saction $%sendpoint $%srequest "%s" }}`, aliasName, aliasName, aliasName, aliasName, token)
 	tmplVarTotal := fmt.Sprintf(`{{ $%sTotal := len $%ss }}`, aliasName, aliasName)

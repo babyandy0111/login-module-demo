@@ -16,8 +16,8 @@
             <a href="javascript:void(0)" id="ipcrp">{{ $menu1.menu_name }}</a>
 
             <fetchdata data-gjs-aliasname="menu2"
-                       data-gjs-endpoint="https://lmd4le8g.codegenapps.com/menu?menu.pid=$menu1.pid"
-                       data-gjs-request="{&#34;menu.pid&#34;:&#34;1&#34;}"
+                       data-gjs-endpoint="https://lmd4le8g.codegenapps.com/menu"
+                       data-gjs-request="{&#34;menu.pid&#34;:$menu1.id}"
                        data-gjs-action="GET"></fetchdata>
 
             <if id="22726769-fc0c-4cde-a1a8-25a304f7f9e4"

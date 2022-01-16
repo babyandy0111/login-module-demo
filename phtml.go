@@ -7,9 +7,9 @@ import (
 
 func main() {
 	str := "$test.id/$qq.test"
-	regexp, _ := regexp.Compile(`^([a-z]+).([a-z]+)`)
-
-	fmt.Println(regexp.FindString(str))
+	regexp, _ := regexp.Compile(`\$[a-zA-Z0-9]*[a-zA-Z0-9]`)
+	test := regexp.FindAllString(str, -1)
+	fmt.Println(test)
 }
 
 //import (
