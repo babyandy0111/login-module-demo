@@ -101,6 +101,12 @@ func getTmpl(html *os.File, token string) string {
 		s.ReplaceWithHtml(memberTagToTmpl(content, token))
 	})
 
+	dom.Find("assigndata").Each(func(i int, s *goquery.Selection) {
+		aliasName := s.AttrOr("data-gjs-aliasname", "")
+		varValue := s.AttrOr("data-gjs-varvalue", "")
+		s.ReplaceWithHtml(assignDataTagToTmpl(aliasName, varValue))
+	})
+
 	tmpl, err := dom.Html()
 	if err != nil {
 		log.Println(err)
@@ -108,6 +114,10 @@ func getTmpl(html *os.File, token string) string {
 	}
 
 	return tmpl
+}
+
+func mkSlice(args ...interface{}) []interface{} {
+	return args
 }
 
 func json2query(jsonString string) string {
@@ -272,6 +282,7 @@ func getNewHtml(temples string) string {
 		"FetchData":       fetchDataInRange,
 		"ReplaceEndpoint": replaceEndpoint,
 		"ReplaceJson":     replaceJson,
+		"mkSlice":         mkSlice,
 	}
 	// log.Println("temples", temples)
 	t, err := template.New("tmp").Funcs(funcMap).Parse(temples)
@@ -375,4 +386,16 @@ func memberTagToTmpl(content, token string) string {
 	} else {
 		return ""
 	}
+}
+
+func assignDataTagToTmpl(aliasName, varValue string) string {
+	tmpValue := strings.Split(varValue, ",")
+	value := ""
+	for _, val := range tmpValue {
+		value = value + "\"" + val + "\" "
+	}
+	value = value[:len(value)-1]
+	result := fmt.Sprintf(`{{ $%ss := mkSlice %s }}`, aliasName, value)
+	// log.Println(result)
+	return result
 }
